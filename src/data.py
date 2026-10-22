@@ -43,14 +43,18 @@ def harmonise_label(v, star_scale=True):
 
 
 def load_csv(path, text_col, label_col, source, domain="hospitality",
-             star_scale=True, max_rows=None, seed=42):
+             star_scale=True, max_rows=None, seed=42, sep=None):
     """Load a CSV of reviews into the project schema.
 
     star_scale=True  -> label_col holds 1-5 stars (<=2 neg, 3 neu, >=4 pos)
     star_scale=False -> label_col holds words / 0-1-2 ids (use for binary 0/1
                         datasets: set label to 0 neg / 2 pos beforehand).
     """
-    df = pd.read_csv(path)
+    # .tsv / .txt files are tab separated; reviews contain quotes, so disable quoting
+    if sep is None:
+        sep = "\t" if str(path).lower().endswith((".tsv", ".txt")) else ","
+    df = pd.read_csv(path, sep=sep, quoting=3 if sep == "\t" else 0,
+                     on_bad_lines="skip", encoding="utf-8")
     df = df[[text_col, label_col]].dropna().rename(
         columns={text_col: "text", label_col: "raw_label"})
     df["label"] = df["raw_label"].map(lambda v: harmonise_label(v, star_scale))
@@ -111,3 +115,20 @@ def stratified_split(df, val=0.1, test=0.1, seed=42):
                             stratify=rest["label"])
     return (train.reset_index(drop=True), v.reset_index(drop=True),
             t.reset_index(drop=True))
+
+
+# Words that signal a hotel / restaurant / travel review. The Arabic 100k dataset
+# mixes books, hotels, restaurants and products, so we keep only hospitality
+# reviews to match our target domain (a domain-adaptation step explained in the report).
+HOSPITALITY_KEYWORDS = [
+    "فندق", "الفندق", "غرفة", "الغرفة", "غرف", "مطعم", "المطعم", "الاستقبال", "الموظفين",
+    "فطور", "الفطور", "بوفيه", "وجبة", "الاكل", "الأكل", "اكل", "مسبح", "المسبح",
+    "اقامة", "إقامة", "الإقامة", "سرير", "حمام", "نظافة", "النظافة", "منتجع", "شاطئ",
+    "hotel", "room", "restaurant", "breakfast", "staff", "resort", "pool", "buffet",
+]
+
+
+def filter_hospitality(df, text_col="text", keywords=HOSPITALITY_KEYWORDS):
+    """Keep only reviews that mention at least one hospitality keyword."""
+    pat = "|".join(map(__import__("re").escape, keywords))
+    return df[df[text_col].str.contains(pat, case=False, regex=True, na=False)].reset_index(drop=True)
