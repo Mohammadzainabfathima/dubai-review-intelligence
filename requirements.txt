@@ -1,0 +1,11 @@
+torch>=2.1
+transformers>=4.40
+sentence-transformers>=2.7
+scikit-learn>=1.3
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+gradio>=4.30
+faiss-cpu>=1.7        # optional: NumPy fallback is used if missing
+anthropic>=0.30       # optional: only for the Claude summary backend
+tqdm
